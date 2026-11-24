@@ -72,3 +72,6 @@ target/
 
 #IntelliJ
 .idea
+
+#env
+./venv
