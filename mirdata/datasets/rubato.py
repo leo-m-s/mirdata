@@ -66,7 +66,7 @@ INDEXES = {
     "test": "sample",
     "1.0": core.Index(
         filename="rubato_index_1.0.json",
-        url="https://zenodo.org/records/14007830/files/rubato_index_1.0.json?download=1",  # -- direct download link for the index hosted at Zenodo
+        url="https://zenodo.org/records/14007830/files/rubato_index_1.0.json?download=1",  # TODO -- direct download link for the index hosted at Zenodo
         checksum="6e1276bdab6de05446ddbbc75e6f6cbe",  # TODO: -- add the checksum of the index hosted at Zenodo
     ),
     "sample": core.Index(filename="rubato_index_1.0_sample.json"),
@@ -92,7 +92,7 @@ LICENSE_INFO = "Creative Commons Attribution 3.0 Unported License (CC BY 3.0) ht
 
 
 class Track(core.Track):
-    """Example track class
+    """RUBATO track class
     # -- YOU CAN AUTOMATICALLY GENERATE THIS DOCSTRING BY CALLING THE SCRIPT:
     # -- `scripts/print_track_docstring.py my_dataset`
     # -- note that you'll first need to have a test track (see "Adding tests to your dataset" below)
@@ -167,12 +167,12 @@ class Track(core.Track):
 # -- if the dataset contains multitracks, you can define a MultiTrack similar to a Track
 # -- you can delete the block of code below if the dataset has no multitracks
 class MultiTrack(core.MultiTrack):
-    """Example multitrack class
+    """RUBATO multitrack class
 
     Args:
         mtrack_id (str): multitrack id
         data_home (str): Local path where the dataset is stored.
-            If `None`, looks for the data in the default directory, `~/mir_datasets/Example`
+            If `None`, looks for the data in the default directory, `~/mir_datasets/rubato`
 
     Attributes:
         mtrack_id (str): track id
@@ -244,7 +244,7 @@ class MultiTrack(core.MultiTrack):
 # -- and, if None is passed, None will be returned
 @io.coerce_to_bytes_io
 def load_audio(fhandle: BinaryIO) -> Tuple[np.ndarray, float]:
-    """Load a Example audio file.
+    """Load a RUBATO audio file.
 
     Args:
         fhandle (str or file-like): path or file-like object pointing to an audio file
@@ -290,13 +290,13 @@ def load_annotation(fhandle: TextIO) -> Optional[annotations.EventData]:
 # -- use this decorator so the docs are complete
 @core.docstring_inherit(core.Dataset)
 class Dataset(core.Dataset):
-    """The Example dataset"""
+    """The RUBATO dataset"""
 
     def __init__(self, data_home=None, version="default"):
         super().__init__(
             data_home,
             version,
-            name=NAME,
+            name="rubato",
             track_class=Track,
             bibtex=BIBTEX,
             indexes=INDEXES,
@@ -309,34 +309,14 @@ class Dataset(core.Dataset):
     # -- you do not have to include this function if there is no metadata
     @core.cached_property
     def _metadata(self):
-        metadata_path = os.path.join(self.data_home, "example_metadata.csv")
+        metadata_path = os.path.join(self.data_home, "metadata_versions.csv")
+        metadata_works_path = os.path.join(self.data_home, "metadata_works.csv")
 
-        # load metadata however makes sense for your dataset
-        metadata_path = os.path.join(data_home, "example_metadata.json")
+       
         with open(metadata_path, "r") as fhandle:
-            metadata = json.load(fhandle)
+            metadata_versions = csv.reader(fhandle, delimiter=";")
 
-        return metadata
-
-    # -- if your dataset needs to overwrite the default download logic, do it here.
-    # -- this function is usually not necessary unless you need very custom download logic
-    def download(self, partial_download=None, force_overwrite=False, cleanup=False):
-        """Download the dataset
-
-        Args:
-            partial_download (list or None):
-                A list of keys of remotes to partially download.
-                If None, all data is downloaded
-            force_overwrite (bool):
-                If True, existing files are overwritten by the downloaded files.
-            cleanup (bool):
-                Whether to delete any zip/tar files after extracting.
-
-        Raises:
-            ValueError: if invalid keys are passed to partial_download
-            IOError: if a downloaded file's checksum is different from expected
-
-        """
-        # see download_utils.downloader for basic usage - if you only need to call downloader
-        # once, you do not need this function at all.
-        # only write a custom function if you need it!
+        with open(metadata_works_path, "r") as fhandle:
+            metadata_works = csv.reader(fhandle, delimiter=";")  #TO
+        #TODO check whether we can return both metadata tables or only versions possible
+        return metadata_versions, metadata_works
