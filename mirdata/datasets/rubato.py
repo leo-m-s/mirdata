@@ -104,6 +104,7 @@ class Track(core.Track):
         audio_path (str): path to audio file
         annotation_path (str): path to annotation file
         # -- Add any of the dataset specific attributes here
+        metadata_path (str): path to metadata file
 
     Cached Properties:
         annotation (EventData): a description of this annotation
@@ -112,12 +113,6 @@ class Track(core.Track):
 
     def __init__(self, track_id, data_home, dataset_name, index, metadata):
 
-        # -- this sets the following attributes:
-        # -- * track_id
-        # -- * _dataset_name
-        # -- * _data_home
-        # -- * _track_paths
-        # -- * _track_metadata
         super().__init__(
             track_id,
             data_home,
@@ -126,33 +121,8 @@ class Track(core.Track):
             metadata=metadata,
         )
 
-        # -- add any dataset specific attributes here
         self.audio_path = self.get_path("audio")
-        self.annotation_path = self.get_path("annotation")
-        self.metadata_path = self.get_path("metadata")
 
-        # -- if the dataset has an *official* e.g. train/test split, use this
-        # -- reserved attribute (can be a property if needed)
-        self.split = ...
-
-    # -- If the dataset has metadata that needs to be accessed by Tracks,
-    # -- such as a table mapping track ids to composers for the full dataset,
-    # -- add them as properties like instead of in the __init__.
-    @property
-    def composer(self) -> Optional[str]:
-        return self._track_metadata.get("composer")
-
-    # -- `annotation` will behave like an attribute, but it will only be loaded
-    # -- and saved when someone accesses it. Useful when loading slightly
-    # -- bigger files or for bigger datasets. By default, we make any time
-    # -- series data loaded from a file a cached property
-    @core.cached_property
-    def annotation(self) -> Optional[annotations.EventData]:
-        return load_annotation(self.annotation_path)
-
-    # -- `audio` will behave like an attribute, but it will only be loaded
-    # -- when someone accesses it and it won't be stored. By default, we make
-    # -- any memory heavy information (like audio) properties
     @property
     def audio(self) -> Optional[Tuple[np.ndarray, float]]:
         """The track's audio
@@ -165,27 +135,27 @@ class Track(core.Track):
         return load_audio(self.audio_path)
 
     @property
-    def version_type(self):
+    def version_type(self) -> Optional[str]:
         return self._track_metadata.get("version_type")
 
     @property
-    def work_name_semantic(self):
+    def work_name_semantic(self) -> Optional[str]:
         return self._track_metadata.get("work_name_semantic")
 
     @property
-    def structure(self):
+    def structure(self) -> Optional[str]:
         return self._track_metadata.get("structure")
 
     @property
-    def instrumentation(self):
+    def instrumentation(self) -> Optional[str]:
         return self._track_metadata.get("instrumentation")
 
     @property
-    def lyrics_original(self):
+    def lyrics_original(self) -> Optional[str]:
         return self._track_metadata.get("lyrics_original")
 
     @property
-    def voice(self):
+    def voice(self) -> Optional[str]:
         return self._track_metadata.get("voice")
 
     @property
@@ -275,7 +245,55 @@ def load_annotation(fhandle: TextIO) -> Optional[annotations.EventData]:
     return annotation_data
 
 
-# -- use this decorator so the docs are complete
+@io.coerce_to_string_io
+def load_localKey(fhandle: TextIO) -> Optional[annotations.KeyData]:
+
+    reader = csv.reader(fhandle, delimiter=" ")
+    reader.next()  # skip header
+    intervals = []
+    localKey_label = []
+    for line in reader:
+        intervals.append([float(line[0]), float(line[1])])
+        localKey_label.append(line[2])
+
+    annotation_data = annotations.KeyData(
+        np.array(intervals), "s", np.array(localKey_label), "harte"
+    )
+    return annotation_data
+
+
+@io.coerce_to_string_io
+def load_beats(fhandle: TextIO) -> Optional[annotations.BeatData]:
+
+    reader = csv.reader(fhandle, delimiter=" ")
+    reader.next()  # skip header
+    time = []
+    beats = []
+    for line in reader:
+        time.append(float(line[0]))
+        beats.append(line[1])
+    annotation_data = annotations.BeatData(
+        np.array(time), "s", np.array(beats), "global-fraction"
+    )
+    return annotation_data
+
+@io.coerce_to_string_io
+def load_chords(fhandle: TextIO) -> Optional[annotations.ChordData]: # TODO shorthand or extended or both? rn shorthand
+
+    reader = csv.reader(fhandle, delimiter=" ")
+    reader.next()  # skip header
+    intervals = []
+    chord_labels = []
+    for line in reader:
+        intervals.append([float(line[0]), float(line[1])])
+        chord_labels.append(line[2])
+
+    annotation_data = annotations.ChordData(
+        np.array(intervals), "s", np.array(chord_labels), "open"
+    )
+    return annotation_data
+
+
 @core.docstring_inherit(core.Dataset)
 class Dataset(core.Dataset):
     """The RUBATO dataset"""
@@ -293,8 +311,6 @@ class Dataset(core.Dataset):
             license_info=LICENSE_INFO,
         )
 
-    # -- if your dataset has a top-level metadata file, write a loader for it here is it top level though??
-    # -- you do not have to include this function if there is no metadata
     @core.cached_property
     def _metadata(self):
         metadata_path = os.path.join(self.data_home, "metadata_versions.csv")
