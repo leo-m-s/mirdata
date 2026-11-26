@@ -86,7 +86,7 @@ DOWNLOAD_INFO = """
 Include any information you want to be printed when dataset.download() is called.
 These can be instructions for how to download the dataset (e.g. request access on zenodo),
 caveats about the download, etc
-""" #TODO: -- add the download information for the dataset
+"""  # TODO: -- add the download information for the dataset
 
 LICENSE_INFO = "Creative Commons Attribution 3.0 Unported License (CC BY 3.0) https://creativecommons.org/licenses/by/3.0/"
 
@@ -129,6 +129,7 @@ class Track(core.Track):
         # -- add any dataset specific attributes here
         self.audio_path = self.get_path("audio")
         self.annotation_path = self.get_path("annotation")
+        self.metadata_path = self.get_path("metadata")
 
         # -- if the dataset has an *official* e.g. train/test split, use this
         # -- reserved attribute (can be a property if needed)
@@ -162,6 +163,75 @@ class Track(core.Track):
 
         """
         return load_audio(self.audio_path)
+
+    @property
+    def version_type(self):
+        return self._track_metadata.get("version_type")
+
+    @property
+    def work_name_semantic(self):
+        return self._track_metadata.get("work_name_semantic")
+
+    @property
+    def structure(self):
+        return self._track_metadata.get("structure")
+
+    @property
+    def instrumentation(self):
+        return self._track_metadata.get("instrumentation")
+
+    @property
+    def lyrics_original(self):
+        return self._track_metadata.get("lyrics_original")
+
+    @property
+    def voice(self):
+        return self._track_metadata.get("voice")
+
+    @property
+    def tuning_A4(self):
+        return self._track_metadata.get("tuning_A4")
+
+    @property
+    def global_key(self):
+        return self._track_metadata.get("global_key")
+
+    @property
+    def transposition(self):
+        return self._track_metadata.get("transposition")
+
+    @property
+    def vocal_shift(self):
+        return self._track_metadata.get("vocal_shift")
+
+    @property
+    def noise_level(self):
+        return self._track_metadata.get("noise_level")
+
+    @property
+    def length(self):
+        return self._track_metadata.get("length")
+
+    @property
+    def license(self):
+        return self._track_metadata.get("license")
+
+    @property
+    def source(self):
+        return self._track_metadata.get("source")
+
+    @property
+    def work_title(self):
+        return self._track_metadata.get("work_title")
+
+    @property
+    def global_key_work(self):
+        return self._track_metadata.get("global_key_work")
+
+    @property
+    def instrumentation_original(self):
+        return self._track_metadata.get("instrumentation_original")
+
 
 @io.coerce_to_bytes_io
 def load_audio(fhandle: BinaryIO) -> Tuple[np.ndarray, float]:
@@ -223,21 +293,16 @@ class Dataset(core.Dataset):
             license_info=LICENSE_INFO,
         )
 
-    # -- if your dataset has a top-level metadata file, write a loader for it here
+    # -- if your dataset has a top-level metadata file, write a loader for it here is it top level though??
     # -- you do not have to include this function if there is no metadata
     @core.cached_property
     def _metadata(self):
         metadata_path = os.path.join(self.data_home, "metadata_versions.csv")
         metadata_works_path = os.path.join(self.data_home, "metadata_works.csv")
 
-       
-        
-
         with open(metadata_works_path, "r") as fhandle:
-            metadata_works = csv.reader(fhandle, delimiter=";")  #TO
-        #TODO check whether we can return both metadata tables or only versions possible 
-        # TODO merge the two metadata tables into one dictionary for each track
-        # TODO: Implement the merging logic here
+            metadata_works = csv.reader(fhandle, delimiter=";")  # TO
+
         metadata_versions_works = {}
         try:
             with open(metadata_path, "r") as fhandle:
@@ -245,15 +310,17 @@ class Dataset(core.Dataset):
                 next(metadata_versions)  # skip header
                 with open(metadata_works_path, "r") as fhandle_works:
                     metadata_works = csv.reader(fhandle_works, delimiter=";")
-                    next(metadata_works)  
+                    next(metadata_works)
 
                     for row in metadata_versions:
-                        key = row[0] #filename
-                        work_id = row[0].split("_")[1] 
+                        key = row[0]  # filename
+                        work_id = row[0].split("_")[1]
                         # get the corresponding work metadata for this version
-                        work_metadata = next((w for w in metadata_works if w[0] == work_id), None) 
+                        work_metadata = next(
+                            (w for w in metadata_works if w[0] == work_id), None
+                        )
                         if work_metadata:
-                            work_title = work_metadata[1] 
+                            work_title = work_metadata[1]
                             composer = work_metadata[3]
                             global_key_work = work_metadata[4]
                             instrumentation_original = work_metadata[5]
@@ -279,7 +346,5 @@ class Dataset(core.Dataset):
                         }
         except FileNotFoundError:
             raise FileNotFoundError("Metadata not found. Did you run .download()?")
-
-            
 
         return metadata_versions_works
