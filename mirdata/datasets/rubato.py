@@ -27,7 +27,7 @@ from smart_open import (
     open,
 )  # if you use the open function, make sure you include this line!
 
-from mirdata import download_utils, core, annotations
+from mirdata import download_utils, core, annotations, io
 
 # -- Add any relevant citations here
 BIBTEX = """
@@ -86,7 +86,7 @@ DOWNLOAD_INFO = """
 Include any information you want to be printed when dataset.download() is called.
 These can be instructions for how to download the dataset (e.g. request access on zenodo),
 caveats about the download, etc
-"""
+""" #TODO: -- add the download information for the dataset
 
 LICENSE_INFO = "Creative Commons Attribution 3.0 Unported License (CC BY 3.0) https://creativecommons.org/licenses/by/3.0/"
 
@@ -163,85 +163,6 @@ class Track(core.Track):
         """
         return load_audio(self.audio_path)
 
-
-# -- if the dataset contains multitracks, you can define a MultiTrack similar to a Track
-# -- you can delete the block of code below if the dataset has no multitracks
-class MultiTrack(core.MultiTrack):
-    """RUBATO multitrack class
-
-    Args:
-        mtrack_id (str): multitrack id
-        data_home (str): Local path where the dataset is stored.
-            If `None`, looks for the data in the default directory, `~/mir_datasets/rubato`
-
-    Attributes:
-        mtrack_id (str): track id
-        tracks (dict): {track_id: Track}
-        track_audio_property (str): the name of the attribute of Track which
-            returns the audio to be mixed
-        # -- Add any of the dataset specific attributes here
-
-    Cached Properties:
-        annotation (EventData): a description of this annotation
-
-    """
-
-    def __init__(
-        self, mtrack_id, data_home, dataset_name, index, track_class, metadata
-    ):
-        # -- this sets the following attributes:
-        # -- * mtrack_id
-        # -- * _dataset_name
-        # -- * _data_home
-        # -- * _multitrack_paths
-        # -- * _metadata
-        # -- * _track_class
-        # -- * _index
-        # -- * track_ids
-        super().__init__(
-            mtrack_id=mtrack_id,
-            data_home=data_home,
-            dataset_name=dataset_name,
-            index=index,
-            track_class=track_class,
-            metadata=metadata,
-        )
-
-        # -- optionally add any multitrack specific attributes here
-        self.mix_path = ...  # this can be called whatever makes sense for the datasets
-        self.annotation_path = ...
-
-        # -- if the dataset has an *official* e.g. train/test split, use this
-        # -- reserved attribute (can be a property if needed)
-        self.split = ...
-
-    # If you want to support multitrack mixing in this dataset, set this property
-    @property
-    def track_audio_property(self):
-        return "audio"  # the attribute of Track, e.g. Track.audio, which returns the audio to mix
-
-    # -- multitracks can optionally have mix-level cached properties and properties
-    @core.cached_property
-    def annotation(self) -> Optional[annotations.EventData]:
-        """output type: description of output"""
-        return load_annotation(self.annotation_path)
-
-    @property
-    def audio(self) -> Optional[Tuple[np.ndarray, float]]:
-        """The track's audio
-
-        Returns:
-            * np.ndarray - audio signal
-            * float - sample rate
-
-        """
-        return load_audio(self.audio_path)
-
-
-# -- this decorator allows this function to take a string or an open bytes file as input
-# -- and in either case converts it to an open file handle.
-# -- It also checks if the file exists
-# -- and, if None is passed, None will be returned
 @io.coerce_to_bytes_io
 def load_audio(fhandle: BinaryIO) -> Tuple[np.ndarray, float]:
     """Load a RUBATO audio file.
@@ -254,10 +175,7 @@ def load_audio(fhandle: BinaryIO) -> Tuple[np.ndarray, float]:
         * float - The sample rate of the audio file
 
     """
-    # -- for example, the code below. This should be dataset specific!
-    # -- By default we load to mono
-    # -- change this if it doesn't make sense for your dataset.
-    return librosa.load(audio_path, sr=None, mono=True)
+    return librosa.load(fhandle, sr=None, mono=True)
 
 
 # -- Write any necessary loader functions for loading the dataset's data
@@ -313,10 +231,55 @@ class Dataset(core.Dataset):
         metadata_works_path = os.path.join(self.data_home, "metadata_works.csv")
 
        
-        with open(metadata_path, "r") as fhandle:
-            metadata_versions = csv.reader(fhandle, delimiter=";")
+        
 
         with open(metadata_works_path, "r") as fhandle:
             metadata_works = csv.reader(fhandle, delimiter=";")  #TO
-        #TODO check whether we can return both metadata tables or only versions possible
-        return metadata_versions, metadata_works
+        #TODO check whether we can return both metadata tables or only versions possible 
+        # TODO merge the two metadata tables into one dictionary for each track
+        # TODO: Implement the merging logic here
+        metadata_versions_works = {}
+        try:
+            with open(metadata_path, "r") as fhandle:
+                metadata_versions = csv.reader(fhandle, delimiter=";")
+                next(metadata_versions)  # skip header
+                with open(metadata_works_path, "r") as fhandle_works:
+                    metadata_works = csv.reader(fhandle_works, delimiter=";")
+                    next(metadata_works)  
+
+                    for row in metadata_versions:
+                        key = row[0] #filename
+                        work_id = row[0].split("_")[1] 
+                        # get the corresponding work metadata for this version
+                        work_metadata = next((w for w in metadata_works if w[0] == work_id), None) 
+                        if work_metadata:
+                            work_title = work_metadata[1] 
+                            composer = work_metadata[3]
+                            global_key_work = work_metadata[4]
+                            instrumentation_original = work_metadata[5]
+                        metadata_versions_works[key] = {
+                            "version_type": row[1],
+                            "work_name_semantic": row[3],
+                            "structure": row[4],
+                            "instrumentation": row[5],
+                            "lyrics_original": row[6],
+                            "voice": row[7],
+                            "tuning_A4": row[8],
+                            "global_key": row[9],
+                            "transposition": row[10],
+                            "vocal_shift": row[11],
+                            "noise_level": row[12],
+                            "length": row[13],
+                            "license": row[14],
+                            "source": row[15],
+                            "work_title": work_title,
+                            "composer": composer,
+                            "global_key_work": global_key_work,
+                            "instrumentation_original": instrumentation_original,
+                        }
+        except FileNotFoundError:
+            raise FileNotFoundError("Metadata not found. Did you run .download()?")
+
+            
+
+        return metadata_versions_works
